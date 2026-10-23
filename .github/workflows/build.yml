@@ -17,7 +17,7 @@ on:
         - RGB20PRO
         - RK2023
       picture_link:
-        description: 'HTML link to your png file'
+        description: 'HTML link OR repository-relative path to your png file (e.g. samples/logo-rg353.png)'
         required: true
       update_hdmi:
         type: choice
@@ -27,7 +27,7 @@ on:
         - Nope
         - Yep
       hdmi_picture_link:
-        description: 'HTML link to your png file for hdmi out'
+        description: 'HTML link OR repository-relative path to your png file for hdmi out'
         required: false
 jobs:
   # This workflow contains a single job.
@@ -46,9 +46,12 @@ jobs:
       shell: bash {0}
       run: |
 
-        # Verify that html link provided is to a file ending in .png or is from ibb.co
-        if [[ "${{ github.event.inputs.picture_link }}" != *.png ]] && [[ "${{ github.event.inputs.picture_link }}" != *.PNG ]] && [[ "${{ github.event.inputs.picture_link }}" != *"ibb.co"* ]]; then
-          echo "::error::Link doesn't seem to contain a .png file"
+        PICTURE_INPUT="${{ github.event.inputs.picture_link }}"
+        HDMI_INPUT="${{ github.event.inputs.hdmi_picture_link }}"
+
+        # Verify primary input is either a PNG path in repo, a direct PNG URL, or an ibb/pasteboard page URL.
+        if [[ ! -f "$PICTURE_INPUT" ]] && [[ "$PICTURE_INPUT" != *.png ]] && [[ "$PICTURE_INPUT" != *.PNG ]] && [[ "$PICTURE_INPUT" != *"ibb.co"* ]] && [[ "$PICTURE_INPUT" != *"pasteboard.co"* ]]; then
+          echo "::error::Input must be a .png URL or a repository file path to a .png"
           exit 1
         fi
 
@@ -67,41 +70,44 @@ jobs:
         export PATH=/opt/toolchains/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/:$PATH
         cd kernel_5_10_226
 
-        # Check to see if this is a pasteboard.co or ibb.co link
-        # If it is a pasteboard.co or ibb.co link
-        # we need to get the real logo link
-        # and attempt to process it.
-        if [[ "${{ github.event.inputs.picture_link }}" == *"pasteboard.co"* ]]; then
-          wget -t 3 -T 60 --no-check-certificate "${{ github.event.inputs.picture_link }}" -O logo.txt
-          real_logo="$(grep 'img data-src="' logo.txt | cut -d '"' -f 2)"
-          wget -t 3 -T 60 --no-check-certificate "${real_logo}" -O logo.png
-        elif [[ "${{ github.event.inputs.picture_link }}" == *"ibb.co"* ]]; then
-          wget -t 3 -T 60 --no-check-certificate "${{ github.event.inputs.picture_link }}" -O logo.txt
-          real_logo="$(grep 'og:image" content="' logo.txt | cut -d '"' -f 4)"
-          wget -t 3 -T 60 --no-check-certificate "${real_logo}" -O logo.png
-        else
-          wget -t 3 -T 60 --no-check-certificate "${{ github.event.inputs.picture_link }}" -O logo.png
-        fi
-        if [ "$?" != "0" ]; then
-          echo "::error::Failed to get ${{ github.event.inputs.picture_link }}"
-          exit 1
-        fi
-        if [ ! -z "${{ github.event.inputs.hdmi_picture_link }}" ]; then
-          if [[ "${{ github.event.inputs.hdmi_picture_link }}" == *"pasteboard.co"* ]]; then
-            wget -t 3 -T 60 --no-check-certificate "${{ github.event.inputs.hdmi_picture_link }}" -O hdmi_logo.txt
-            real_logo="$(grep 'img data-src="' hdmi_logo.txt | cut -d '"' -f 2)"
-            wget -t 3 -T 60 --no-check-certificate "${real_logo}" -O hdmi_logo.png
-          elif [[ "${{ github.event.inputs.hdmi_picture_link }}" == *"ibb.co"* ]]; then
-            wget -t 3 -T 60 --no-check-certificate "${{ github.event.inputs.hdmi_picture_link }}" -O hdmi_logo.txt
-            real_logo="$(grep 'og:image" content="' hdmi_logo.txt | cut -d '"' -f 4)"
-            wget -t 3 -T 60 --no-check-certificate "${real_logo}" -O hdmi_logo.png
-          else
-            wget -t 3 -T 60 --no-check-certificate "${{ github.event.inputs.hdmi_picture_link }}" -O hdmi_logo.png
+        fetch_logo() {
+          local input="$1"
+          local output="$2"
+          local label="$3"
+
+          if [[ -f "$input" ]]; then
+            cp -f "$input" "$output"
+            return 0
           fi
-          if [ "$?" != "0" ]; then
-            echo "::error::Failed to get ${{ github.event.inputs.hdmi_picture_link }}"
+
+          if [[ "$input" == *"pasteboard.co"* ]]; then
+            wget -t 3 -T 60 --no-check-certificate "$input" -O "${label}.txt"
+            real_logo="$(grep 'img data-src="' "${label}.txt" | cut -d '"' -f 2)"
+            wget -t 3 -T 60 --no-check-certificate "${real_logo}" -O "$output"
+          elif [[ "$input" == *"ibb.co"* ]]; then
+            wget -t 3 -T 60 --no-check-certificate "$input" -O "${label}.txt"
+            real_logo="$(grep 'og:image" content="' "${label}.txt" | cut -d '"' -f 4)"
+            wget -t 3 -T 60 --no-check-certificate "${real_logo}" -O "$output"
+          else
+            wget -t 3 -T 60 --no-check-certificate "$input" -O "$output"
+          fi
+        }
+
+        fetch_logo "$PICTURE_INPUT" logo.png logo || {
+          echo "::error::Failed to get $PICTURE_INPUT"
+          exit 1
+        }
+
+        if [[ -n "$HDMI_INPUT" ]]; then
+          if [[ ! -f "$HDMI_INPUT" ]] && [[ "$HDMI_INPUT" != *.png ]] && [[ "$HDMI_INPUT" != *.PNG ]] && [[ "$HDMI_INPUT" != *"ibb.co"* ]] && [[ "$HDMI_INPUT" != *"pasteboard.co"* ]]; then
+            echo "::error::HDMI input must be a .png URL or a repository file path to a .png"
             exit 1
           fi
+
+          fetch_logo "$HDMI_INPUT" hdmi_logo.png hdmi_logo || {
+            echo "::error::Failed to get $HDMI_INPUT"
+            exit 1
+          }
         fi
 
         # Process the downloaded logo into the format necessary for the kernel

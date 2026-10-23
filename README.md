@@ -12,6 +12,7 @@ For adding your own boot logo for dArkOS for supported rk3566 devices
 6. Select your Device.
 7. Paste the HTML link to the png image that should be downloaded to generate the current kernel with your preferred logo.
    - Images from [imgbb.com](https://github.com/christianhaitian/rk3566_logo_generator#uploading-png-images-to-imgbbcom) or [pasteboard.co](https://github.com/christianhaitian/rk3566_logo_generator#uploading-png-images-to-pasteboardco) are recommended for this process.  See instructions below about how to use either free site.
+  - Alternative (recommended when external download fails): provide a repository-relative PNG path, for example `samples/logo-rg353-640x480.png`.
 8. Wait 15-20 minutes or so.  If all goes well, The workflow should end with a green checkmark.
 9. Click on the workflow and scroll down to the Artifacts section.
 10. Click on the image file and download it.
@@ -27,6 +28,7 @@ Notes:
 - PNG logos for the RGB20 Pro device must be 1024 pixels in width and 768 pixels in height
 - If you'd like to update the logo shown using hdmi out as well, you'll need to select Yes in the **Would you like to update the hdmi out logo as well?** question.
   - The hdmi logo must be 1280 pixels in width and 720 pixels in height.
+  - The hdmi source can also be a repository-relative PNG path, for example `samples/logo-rg353-hdmi-1280x720.png`.
   - If a logo source for the hdmi out is not provided, this process will resize the first logo provided.  Results may vary with it.
 - This process has successfully been tested with images loaded to [imgbb](https://imgbb.com/upload) and [pasteboard.co](https://pasteboard.co/)
 
